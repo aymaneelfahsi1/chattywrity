@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+    <title>ChattyWrity Settings</title>
+    <link rel="stylesheet" href="settings.css">
+</head>
+
+<body>
+    <div class="settings-container">
+        <header class="header">
+            <h1>⚙️ Settings</h1>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab active" data-tab="dictionary">Dictionary</button>
+            <button class="tab" data-tab="snippets">Snippets</button>
+            <button class="tab" data-tab="styles">Styles</button>
+            <button class="tab" data-tab="general">General</button>
+        </nav>
+
+        <section class="tab-content active" id="tab-dictionary">
+            <h2>Personal Dictionary</h2>
+            <p class="description">Add custom words and spelling corrections.</p>
+
+            <div class="input-group">
+                <input type="text" id="new-word" placeholder="Add new word...">
+                <button id="add-word-btn">+ Add</button>
+            </div>
+
+            <div class="list-container" id="word-list">
+            </div>
+
+            <h3>Corrections</h3>
+            <div class="input-group">
+                <input type="text" id="wrong-word" placeholder="Misspelling">
+                <span>→</span>
+                <input type="text" id="correct-word" placeholder="Correct spelling">
+                <button id="add-correction-btn">+ Add</button>
+            </div>
+
+            <div class="list-container" id="correction-list">
+            </div>
+        </section>
+
+        <section class="tab-content" id="tab-snippets">
+            <h2>Voice Snippets</h2>
+            <p class="description">Create voice shortcuts that expand to full text.</p>
+
+            <div class="snippet-form">
+                <input type="text" id="snippet-trigger" placeholder="Trigger phrase (e.g., 'my email')">
+                <textarea id="snippet-expansion" placeholder="Expansion text..." rows="3"></textarea>
+                <button id="add-snippet-btn">+ Add Snippet</button>
+            </div>
+
+            <div class="list-container" id="snippet-list">
+            </div>
+        </section>
+
+        <section class="tab-content" id="tab-styles">
+            <h2>Per-App Styles</h2>
+            <p class="description">Adjust tone based on the active application.</p>
+
+            <div class="style-form">
+                <input type="text" id="app-name" placeholder="App name (e.g., OUTLOOK.EXE)">
+                <select id="style-mode">
+                    <option value="neutral">Neutral</option>
+                    <option value="formal">Formal</option>
+                    <option value="casual">Casual</option>
+                    <option value="code">Code</option>
+                </select>
+                <button id="add-style-btn">+ Add</button>
+            </div>
+
+            <div class="list-container" id="style-list">
+            </div>
+        </section>
+
+        <section class="tab-content" id="tab-general">
+            <h2>General Settings</h2>
+
+            <div class="setting-row">
+                <label>Hotkey</label>
+                <span class="value">Ctrl + Space</span>
+            </div>
+
+            <div class="setting-row">
+                <label>Model</label>
+                <span class="value">ggml-large-v2-q8_0</span>
+            </div>
+
+            <div class="setting-row">
+                <label>Remove Filler Words</label>
+                <input type="checkbox" id="remove-filler" checked>
+            </div>
+
+            <div class="setting-row">
+                <label>Auto Punctuation</label>
+                <input type="checkbox" id="auto-punctuation" checked>
+            </div>
+
+            <div class="setting-row">
+                <label>Format Lists</label>
+                <input type="checkbox" id="format-lists" checked>
+            </div>
+
+            <div class="about">
+                <h3>About ChattyWrity</h3>
+                <p>Version 1.0.0</p>
+                <p>Speech-to-text powered by whisper.cpp</p>
+            </div>
+        </section>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+
+</html>

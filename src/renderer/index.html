@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <title>ChattyWrity</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="glass-container" id="main-container">
+    <div class="status-indicator"></div>
+
+    <div class="content-wrapper">
+      <!-- Idle State -->
+      <div class="state-view idle active" id="state-idle">
+        <div class="prompt-text">READY</div>
+        <div class="sub-text">CTRL+SPACE TO SPEAK</div>
+      </div>
+
+      <!-- Starting State -->
+      <div class="state-view starting" id="state-starting">
+        <div class="prompt-text">INITIALIZING...</div>
+      </div>
+
+      <!-- Recording State -->
+      <div class="state-view recording" id="state-recording">
+        <div class="waveform">
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+        </div>
+        <div class="prompt-text blink">LISTENING...</div>
+        <div class="sub-text" style="margin-top: 8px; font-size: 10px; opacity: 0.7;">STOP TALKING TO SEND</div>
+      </div>
+
+      <!-- Processing State -->
+      <div class="state-view processing" id="state-processing">
+        <div class="loader-ring"></div>
+        <div class="prompt-text">TRANSCRIBING</div>
+      </div>
+
+      <!-- Typing State -->
+      <div class="state-view typing" id="state-typing">
+        <div class="success-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="transcription-preview" id="transcription-text"></div>
+      </div>
+
+      <!-- Error State -->
+      <div class="state-view error" id="state-error">
+        <div class="error-text" id="error-text">SYSTEM FAILURE</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+
+</html>
