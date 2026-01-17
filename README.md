@@ -36,7 +36,7 @@ This project uses `nodejs-whisper` and other native modules that must be compile
 3.  Download the Whisper Model:
     The application requires a GGML quantization of the Whisper model.
     -   Create a directory named `models` in the project root.
-    -   Download `ggml-small.en-q8_0.bin` (or your preferred compatible model) from HuggingFace.
+    -   Download `ggml-small.en-q8_0.bin` (or your preferred compatible model) from HuggingFace: [https://huggingface.co/ggerganov/whisper.cpp/tree/main](https://huggingface.co/ggerganov/whisper.cpp/tree/main)
     -   Place the `.bin` file inside the `models` directory.
     -   Ensure `src/main/transcriber.ts` references the correct filename.
 
@@ -76,7 +76,7 @@ This script:
 -   **Icon**: The installer uses `resources/icon.png`.
 
 The output installer will be located in the `dist` directory.
-**Ready-to-install file:** `ChattyWrity Setup 1.0.0.exe`
+The output installer will be located in the `dist` directory.
 
 ## Project Structure
 
