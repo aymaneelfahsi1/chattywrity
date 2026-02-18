@@ -23,7 +23,7 @@ This project uses `nodejs-whisper` and other native modules that must be compile
 
 1.  Clone the repository:
     ```bash
-    git clone [https://github.com/aymaneelfahsi1/chattywrity](https://github.com/aymaneelfahsi1/chattywrity).git
+    git clone https://github.com/aymaneelfahsi1/chattywrity.git
     cd chattywrity
     ```
 
