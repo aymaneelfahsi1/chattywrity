@@ -141,7 +141,7 @@ All options are saved and persist between sessions.
 
 ## Demo
 
-[![](demo.mp4)](demo.mp4)
+![Demo](demo.mp4)
 
 ## License
 
