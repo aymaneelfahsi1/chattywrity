@@ -2,7 +2,6 @@ import { spawn, ChildProcess, execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { app } from 'electron';
 import ffmpegStatic from 'ffmpeg-static';
 
 const ffmpegPath = ffmpegStatic?.replace('app.asar', 'app.asar.unpacked') || 'ffmpeg';

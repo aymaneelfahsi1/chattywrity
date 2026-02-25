@@ -1,1 +1,192 @@
-import * as fs from 'fs';import * as path from 'path';import { app } from 'electron';interface ProcessingOptions {    removeFiller: boolean;    autoPunctuation: boolean;    formatLists: boolean;    handleCorrections: boolean;    codeMode: boolean;}const FILLER_WORDS = [    'um', 'uh', 'uhh', 'umm', 'er', 'err', 'ah', 'ahh',    'like', 'you know', 'i mean', 'sort of', 'kind of',    'basically', 'actually', 'literally', 'honestly',    'so yeah', 'right', 'okay so'];const CORRECTION_PATTERNS = [    /(\w+)\s*\.{2,}\s*(?:actually|no wait|i mean|sorry)\s+(\w+)/gi,    /[^.!?]*(?:delete that|scratch that|never mind)[.!?]?/gi,];export class AIProcessor {    private options: ProcessingOptions;    constructor(options?: Partial<ProcessingOptions>) {        this.options = {            removeFiller: true,            autoPunctuation: true,            formatLists: true,            handleCorrections: true,            codeMode: false,            ...options        };    }    setCodeMode(enabled: boolean): void {        this.options.codeMode = enabled;    }    process(text: string): string {        if (!text || text.trim().length === 0) {            return '';        }        let processed = text.trim();        if (this.options.handleCorrections) {            processed = this.handleCorrections(processed);        }        if (this.options.removeFiller) {            processed = this.removeFillerWords(processed);        }        if (this.options.formatLists) {            processed = this.formatLists(processed);        }        if (this.options.autoPunctuation) {            processed = this.addPunctuation(processed);        }        if (this.options.codeMode) {            processed = this.processCodeMode(processed);        }        processed = this.capitalizeSentences(processed);        processed = processed.replace(/\s+/g, ' ').trim();        return processed;    }    private removeFillerWords(text: string): string {        let result = text;        for (const filler of FILLER_WORDS) {            const regex = new RegExp(`\\b${filler}\\b[,]?\\s*`, 'gi');            result = result.replace(regex, '');        }        return result;    }    private handleCorrections(text: string): string {        let result = text;        result = result.replace(            /(\b\w+\b)\s*[.]{2,}\s*(?:actually|no wait|i mean)\s+(\b\w+\b)/gi,            '$2'        );        result = result.replace(            /[^.!?]*(?:delete that|scratch that|never mind that)[.!?]?\s*/gi,            ''        );        return result;    }    private formatLists(text: string): string {        let result = text;        const numberedPattern = /\b(\d+)\s+(\w+(?:\s+\w+)?)\s+(?=\d+\s+\w|\s*$)/gi;        const listMatch = text.match(/\b\d+\s+\w+/g);        if (listMatch && listMatch.length >= 2) {            result = result.replace(/\b(\d+)\s+/g, '\n$1. ');            result = result.trim();        }        return result;    }    private addPunctuation(text: string): string {        let result = text;        if (!/[.!?]$/.test(result)) {            result += '.';        }        result = result.replace(/\bperiod\b/gi, '.');        result = result.replace(/\bcomma\b/gi, ',');        result = result.replace(/\bquestion mark\b/gi, '?');        result = result.replace(/\bexclamation point\b/gi, '!');        result = result.replace(/\bexclamation mark\b/gi, '!');        result = result.replace(/\bcolon\b/gi, ':');        result = result.replace(/\bsemicolon\b/gi, ';');        result = result.replace(/\bnew line\b/gi, '\n');        result = result.replace(/\bnew paragraph\b/gi, '\n\n');        result = result.replace(/\bopen parenthesis\b/gi, '(');        result = result.replace(/\bclose parenthesis\b/gi, ')');        result = result.replace(/\bopen quote\b/gi, '"');        result = result.replace(/\bclose quote\b/gi, '"');        return result;    }    private processCodeMode(text: string): string {        let result = text;        result = result.replace(/\bcamel case\s+(\w+)\s+(\w+)/gi, (_, a, b) => {            return a.toLowerCase() + b.charAt(0).toUpperCase() + b.slice(1).toLowerCase();        });        result = result.replace(/\bsnake case\s+(\w+)\s+(\w+)/gi, (_, a, b) => {            return a.toLowerCase() + '_' + b.toLowerCase();        });        result = result.replace(/\bequals\b/gi, '=');        result = result.replace(/\bplus\b/gi, '+');        result = result.replace(/\bminus\b/gi, '-');        result = result.replace(/\btimes\b/gi, '*');        result = result.replace(/\bdivided by\b/gi, '/');        result = result.replace(/\bopen bracket\b/gi, '[');        result = result.replace(/\bclose bracket\b/gi, ']');        result = result.replace(/\bopen brace\b/gi, '{');        result = result.replace(/\bclose brace\b/gi, '}');        result = result.replace(/\barrow function\b/gi, '=>');        result = result.replace(/\bnull\b/gi, 'null');        result = result.replace(/\bundefined\b/gi, 'undefined');        return result;    }    private capitalizeSentences(text: string): string {        let result = text.charAt(0).toUpperCase() + text.slice(1);        result = result.replace(/\[.*?\]/g, '');        result = result.replace(/([.!?]\s+)(\w)/g, (_, punctuation, letter) => {            return punctuation + letter.toUpperCase();        });        return result;    }}
+import * as fs from 'fs';
+import * as path from 'path';
+import { app } from 'electron';
+
+interface ProcessingOptions {
+    removeFiller: boolean;
+    autoPunctuation: boolean;
+    formatLists: boolean;
+    handleCorrections: boolean;
+    codeMode: boolean;
+}
+
+const FILLER_WORDS = [
+    'um', 'uh', 'uhh', 'umm', 'er', 'err', 'ah', 'ahh',
+    'like', 'you know', 'i mean', 'sort of', 'kind of',
+    'basically', 'actually', 'literally', 'honestly',
+    'so yeah', 'right', 'okay so'
+];
+
+const CORRECTION_PATTERNS = [
+    /(\w+)\s*\.{2,}\s*(?:actually|no wait|i mean|sorry)\s+(\w+)/gi,
+];
+
+export class AIProcessor {
+    private options: ProcessingOptions;
+    private dataPath: string;
+
+    constructor(options?: Partial<ProcessingOptions>) {
+        this.dataPath = path.join(app.getPath('userData'), 'processing-options.json');
+        const saved = this.loadSavedOptions();
+        this.options = {
+            removeFiller: true,
+            autoPunctuation: true,
+            formatLists: true,
+            handleCorrections: true,
+            codeMode: false,
+            ...saved,
+            ...options
+        };
+    }
+
+    private loadSavedOptions(): Partial<ProcessingOptions> {
+        try {
+            if (fs.existsSync(this.dataPath)) {
+                const data = fs.readFileSync(this.dataPath, 'utf-8');
+                return JSON.parse(data);
+            }
+        } catch (error) {
+        }
+        return {};
+    }
+
+    private saveOptions(): void {
+        try {
+            const dir = path.dirname(this.dataPath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            const { codeMode, ...saveable } = this.options;
+            fs.writeFileSync(this.dataPath, JSON.stringify(saveable, null, 2));
+        } catch (error) {
+        }
+    }
+
+    getOptions(): ProcessingOptions {
+        return { ...this.options };
+    }
+
+    updateOptions(opts: Partial<ProcessingOptions>): void {
+        this.options = { ...this.options, ...opts };
+        this.saveOptions();
+    }
+
+    setCodeMode(enabled: boolean): void {
+        this.options.codeMode = enabled;
+    }
+
+    process(text: string): string {
+        if (!text || text.trim().length === 0) {
+            return '';
+        }
+
+        let processed = text.trim();
+
+        if (this.options.handleCorrections) {
+            processed = this.handleCorrections(processed);
+        }
+
+        if (this.options.removeFiller) {
+            processed = this.removeFillerWords(processed);
+        }
+
+        if (this.options.formatLists) {
+            processed = this.formatLists(processed);
+        }
+
+        if (this.options.autoPunctuation) {
+            processed = this.addPunctuation(processed);
+        }
+
+        if (this.options.codeMode) {
+            processed = this.processCodeMode(processed);
+        }
+
+        processed = this.capitalizeSentences(processed);
+        processed = processed.replace(/\s+/g, ' ').trim();
+
+        return processed;
+    }
+
+    private removeFillerWords(text: string): string {
+        let result = text;
+        for (const filler of FILLER_WORDS) {
+            const regex = new RegExp(`\\b${filler}\\b[,]?\\s*`, 'gi');
+            result = result.replace(regex, '');
+        }
+        return result;
+    }
+
+    private handleCorrections(text: string): string {
+        let result = text;
+        result = result.replace(
+            /(\b\w+\b)\s*[.]{2,}\s*(?:actually|no wait|i mean)\s+(\b\w+\b)/gi,
+            '$2'
+        );
+        return result;
+    }
+
+    private formatLists(text: string): string {
+        let result = text;
+        const numberedPattern = /\b(\d+)\s+(\w+(?:\s+\w+)?)\s+(?=\d+\s+\w|\s*$)/gi;
+        const listMatch = text.match(/\b\d+\s+\w+/g);
+        if (listMatch && listMatch.length >= 2) {
+            result = result.replace(/\b(\d+)\s+/g, '\n$1. ');
+            result = result.trim();
+        }
+        return result;
+    }
+
+    private addPunctuation(text: string): string {
+        let result = text;
+        if (!/[.!?]$/.test(result)) {
+            result += '.';
+        }
+        result = result.replace(/\bperiod\b/gi, '.');
+        result = result.replace(/\bcomma\b/gi, ',');
+        result = result.replace(/\bquestion mark\b/gi, '?');
+        result = result.replace(/\bexclamation point\b/gi, '!');
+        result = result.replace(/\bexclamation mark\b/gi, '!');
+        result = result.replace(/\bcolon\b/gi, ':');
+        result = result.replace(/\bsemicolon\b/gi, ';');
+        result = result.replace(/\bnew line\b/gi, '\n');
+        result = result.replace(/\bnew paragraph\b/gi, '\n\n');
+        result = result.replace(/\bopen parenthesis\b/gi, '(');
+        result = result.replace(/\bclose parenthesis\b/gi, ')');
+        result = result.replace(/\bopen quote\b/gi, '"');
+        result = result.replace(/\bclose quote\b/gi, '"');
+        return result;
+    }
+
+    private processCodeMode(text: string): string {
+        let result = text;
+        result = result.replace(/\bcamel case\s+(\w+)\s+(\w+)/gi, (_, a, b) => {
+            return a.toLowerCase() + b.charAt(0).toUpperCase() + b.slice(1).toLowerCase();
+        });
+        result = result.replace(/\bsnake case\s+(\w+)\s+(\w+)/gi, (_, a, b) => {
+            return a.toLowerCase() + '_' + b.toLowerCase();
+        });
+        result = result.replace(/\bequals\b/gi, '=');
+        result = result.replace(/\bplus\b/gi, '+');
+        result = result.replace(/\bminus\b/gi, '-');
+        result = result.replace(/\btimes\b/gi, '*');
+        result = result.replace(/\bdivided by\b/gi, '/');
+        result = result.replace(/\bopen bracket\b/gi, '[');
+        result = result.replace(/\bclose bracket\b/gi, ']');
+        result = result.replace(/\bopen brace\b/gi, '{');
+        result = result.replace(/\bclose brace\b/gi, '}');
+        result = result.replace(/\barrow function\b/gi, '=>');
+        result = result.replace(/\bnull\b/gi, 'null');
+        result = result.replace(/\bundefined\b/gi, 'undefined');
+        return result;
+    }
+
+    private capitalizeSentences(text: string): string {
+        let result = text.charAt(0).toUpperCase() + text.slice(1);
+        result = result.replace(/\[.*?\]/g, '');
+        result = result.replace(/([.!?]\s+)(\w)/g, (_, punctuation, letter) => {
+            return punctuation + letter.toUpperCase();
+        });
+        return result;
+    }
+}

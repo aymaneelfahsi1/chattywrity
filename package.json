@@ -1,10 +1,10 @@
 {
   "name": "chattywrity",
-  "version": "1.0.0",
+  "version": "0.6.0",
   "description": "Windows speech-to-text app using Whisper, activated by Ctrl+Spacebar",
   "main": "dist/main/index.js",
   "scripts": {
-    "postcompile": "copy /Y src\\renderer\\*.html dist\\renderer\\ && copy /Y src\\renderer\\*.css dist\\renderer\\",
+    "postcompile": "powershell -Command \"if (-not (Test-Path 'dist\\renderer')) { New-Item -ItemType Directory -Path 'dist\\renderer' -Force }; Copy-Item -Path 'src\\renderer\\*.html' -Destination 'dist\\renderer\\' -Force; Copy-Item -Path 'src\\renderer\\*.css' -Destination 'dist\\renderer\\' -Force\"",
     "dev": "tsc && npm run postcompile && electron .",
     "build": "tsc && npm run postcompile && electron-builder",
     "compile": "tsc && npm run postcompile"

@@ -5,66 +5,92 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com">
+    content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; media-src 'self'; img-src 'self' data:">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;500;700&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <title>ChattyWrity</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-  <div class="glass-container" id="main-container">
-    <div class="status-indicator"></div>
+  <div class="pill-container" id="main-container">
+    <div class="pill-glow"></div>
+    <div class="pill-content">
 
-    <div class="content-wrapper">
-      <!-- Idle State -->
-      <div class="state-view idle active" id="state-idle">
-        <div class="prompt-text">READY</div>
-        <div class="sub-text">CTRL+SPACE TO SPEAK</div>
-      </div>
-
-      <!-- Starting State -->
-      <div class="state-view starting" id="state-starting">
-        <div class="prompt-text">INITIALIZING...</div>
-      </div>
-
-      <!-- Recording State -->
-      <div class="state-view recording" id="state-recording">
-        <div class="waveform">
-          <div class="bar"></div>
-          <div class="bar"></div>
-          <div class="bar"></div>
-          <div class="bar"></div>
-          <div class="bar"></div>
-          <div class="bar"></div>
+      <!-- Icon Zone (Left) -->
+      <div class="icon-zone">
+        <div class="icon-wrapper mic-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+          </svg>
         </div>
-        <div class="prompt-text blink">LISTENING...</div>
-        <div class="sub-text" style="margin-top: 8px; font-size: 10px; opacity: 0.7;">STOP TALKING TO SEND</div>
-      </div>
-
-      <!-- Processing State -->
-      <div class="state-view processing" id="state-processing">
-        <div class="loader-ring"></div>
-        <div class="prompt-text">TRANSCRIBING</div>
-      </div>
-
-      <!-- Typing State -->
-      <div class="state-view typing" id="state-typing">
-        <div class="success-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <div class="icon-wrapper eq-wrapper">
+          <div class="eq-bars">
+            <div class="eq-bar" data-index="0"></div>
+            <div class="eq-bar" data-index="1"></div>
+            <div class="eq-bar" data-index="2"></div>
+            <div class="eq-bar" data-index="3"></div>
+            <div class="eq-bar" data-index="4"></div>
+          </div>
+        </div>
+        <div class="icon-wrapper spinner-wrapper">
+          <svg class="spinner" viewBox="0 0 50 50">
+            <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+          </svg>
+        </div>
+        <div class="icon-wrapper success-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         </div>
-        <div class="transcription-preview" id="transcription-text"></div>
+        <div class="icon-wrapper error-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
       </div>
 
-      <!-- Error State -->
-      <div class="state-view error" id="state-error">
-        <div class="error-text" id="error-text">SYSTEM FAILURE</div>
+      <!-- Text Zone (Right) -->
+      <div class="text-zone">
+        <div class="state-view active" id="state-idle">
+          <div class="title">Ready to dictate</div>
+          <div class="subtitle">Press Ctrl+Space</div>
+        </div>
+        <div class="state-view" id="state-starting">
+          <div class="title">Initializing...</div>
+          <div class="subtitle">Warming up</div>
+        </div>
+        <div class="state-view" id="state-recording">
+          <div class="title pulse-text">Listening...</div>
+          <div class="subtitle">Speak now</div>
+        </div>
+        <div class="state-view" id="state-processing">
+          <div class="title">Transcribing</div>
+          <div class="subtitle">Processing speech</div>
+        </div>
+        <div class="state-view" id="state-typing">
+          <div class="title success-text">Success</div>
+          <div class="subtitle" id="transcription-text"></div>
+        </div>
+        <div class="state-view" id="state-error">
+          <div class="title error-text">System Error</div>
+          <div class="subtitle" id="error-text">Failed to record</div>
+        </div>
       </div>
+
+      <!-- App Icon (Right) -->
+      <div class="app-icon-wrapper">
+        <img class="app-icon" id="active-app-icon" src="" alt="" draggable="false">
+      </div>
+
     </div>
   </div>
 

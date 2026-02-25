@@ -1,117 +1,147 @@
 # ChattyWrity
 
-ChattyWrity is a global speech-to-text desktop application for Windows. It utilizes OpenAI's Whisper model (via C++ bindings) to provide high-accuracy, local, and private transcription. The application is designed to be overlay-based, activated via a global hotkey (Ctrl+Space), mimicking the experience of tools like Wispr Flow.
+ChattyWrity is a Windows desktop app for voice dictation. Press Ctrl+Space to start speaking, and it transcribes your audio locally using Whisper, then types the result into whichever window you have open.
 
-## Prerequisites
+## What It Does
 
-Before setting up the project, ensure your development environment meets the following requirements. This project relies on native Node.js modules which require C++ compilation tools.
+The app runs in background on Windows. When you hit the global hotkey, a pill-shaped overlay appears at top of your screen showing recording status. The app detects which window you have active and shows that application's icon in the overlay.
 
-### 1. Node.js
-- Install Node.js (LTS version recommended, v18+).
+All transcription happens on your machine using Whisper (GGML quantized format). It uses Whisper.cpp through native C++ bindings, which will use CUDA if you have an NVIDIA GPU. No audio is sent anywhere - it's entirely local.
 
-### 2. Visual Studio Build Tools (Critical)
-This project uses `nodejs-whisper` and other native modules that must be compiled during installation.
-1.  Download **Visual Studio Build Tools**.
-2.  During installation, select the **Desktop development with C++** workload.
-3.  Ensure the **Windows 10/11 SDK** is checked in the optional components.
-4.  Reboot your machine after installation.
+## How to Use
 
-### 3. Git
-- Install Git for version control.
+1. Press `Ctrl+Space` to start recording
+2. Speak what you want to type
+3. Wait for transcription
+4. The app types the processed text into your active window
 
-## Installation
+The overlay shows the active app's icon on the right side.
 
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/aymaneelfahsi1/chattywrity.git
-    cd chattywrity
-    ```
+## Features
 
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-    *Note: If this fails with `node-gyp` errors, verify your Visual Studio Build Tools installation.*
+### Active App Detection
 
-3.  Download the Whisper Model:
-    The application requires a GGML quantization of the Whisper model.
-    -   Create a directory named `models` in the project root.
-    -   Download `ggml-small.en-q8_0.bin` (or your preferred compatible model) from HuggingFace: [https://huggingface.co/ggerganov/whisper.cpp/tree/main](https://huggingface.co/ggerganov/whisper.cpp/tree/main)
-    -   Place the `.bin` file inside the `models` directory.
-    -   Ensure `src/main/transcriber.ts` references the correct filename.
+The app detects which window is currently active and shows its icon in the overlay. This lets you confirm where your text will be inserted.
 
-## Development Workflow
+### Text Processing
 
-To run the application in development mode with hot-reloading (via `tsc`):
+The app processes your speech in several ways. You can configure these options in Settings:
 
+- **Filler removal**: Removes words like "um", "uh", "like", "basically"
+- **Auto punctuation**: Converts spoken words to punctuation - "period" becomes ".", "comma" becomes ",", "question mark" becomes "?"
+- **Code mode**: Converts spoken terms to programming syntax - "equals" becomes "=", "plus" becomes "+", "bracket" becomes "[" or "]"
+- **Capitalization**: Automatically capitalizes the first letter of sentences
+
+### Dictionary
+
+Add custom words that Whisper might mishear. This improves accuracy for names, jargon, or project-specific terms. You can add words from the Settings window.
+
+### Voice Snippets
+
+Create shortcuts where saying a short phrase expands to longer text. Examples include "my email" to insert your email address, or "sign off" to add your signature. Configure these in Settings.
+
+### Per-App Styles
+
+Configure different text formatting for different applications. For example, set formal mode for email apps, casual mode for chat apps, or code mode for IDEs. This adjusts the tone automatically based on what you're using.
+
+Built-in support includes VS Code, Cursor, Outlook, Slack, Discord, Telegram, Teams, and others. Add custom rules in Settings.
+
+### Startup
+
+Right-click the tray icon to enable "Start on Boot" so the app runs automatically when Windows starts.
+
+## Development
+
+### What You Need
+
+- Node.js 18 or newer
+- Visual Studio Build Tools with C++ workload
+- Windows 10/11 SDK
+- Git
+
+### Getting Started
+
+1. Clone repository:
+```bash
+git clone <repository-url>
+cd chattywrity
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+Note: If this fails with node-gyp errors, check your Visual Studio Build Tools installation.
+
+3. Download Whisper model:
+- Create a `models/` folder in the project root
+- Download `ggml-small.en-q8_0.bin` from [HuggingFace](https://huggingface.co/ggerganov/whisper.cpp/tree/main)
+- Place the `.bin` file in `models/`
+
+### Running
+
+Development mode:
 ```bash
 npm run dev
 ```
 
-This command will:
-1.  Compile TypeScript files.
-2.  Copy static assets (HTML/CSS) to the `dist` folder.
-3.  Launch Electron.
+This compiles TypeScript, copies HTML and CSS files, and starts Electron.
 
-### Key Hotkeys
--   **Ctrl+Space**: Toggle recording.
--   **Esc**: Cancel recording / Close overlay.
+### Building
 
-## Building for Production
-
-To create a distributable Windows installer (`.exe`):
-
+Create a Windows installer:
 ```bash
 npm run build
 ```
 
-This script:
-1.  Compiles the TypeScript source.
-2.  Copies assets.
-3.  Uses `electron-builder` to package the application.
+The installer ends up in the `dist/` folder.
 
-### Build Configuration Notes
--   **ASAR Unpacking**: The build configuration (in `package.json`) explicitly unpacks `nodejs-whisper` and `ffmpeg-static`. This is required because these native binaries cannot be executed directly from within the compressed ASAR archive.
--   **Compression**: Compression is set to `"store"` (no compression) to avoid memory allocation errors during the build process on systems with limited RAM.
--   **Icon**: The installer uses `resources/icon.png`.
+### Code Structure
 
-The output installer will be located in the `dist` directory.
-The output installer will be located in the `dist` directory.
+**Main Process** (`src/main/`):
+- `index.ts`: Electron setup, window creation, global hotkey registration
+- `stateManager.ts`: Recording state, microphone detection via FFmpeg, silence detection
+- `transcriber.ts`: Whisper.cpp interface for transcription
+- `textInjector.ts`: Uses robotjs to paste text into active application
+- `styleManager.ts`: Active window detection, app icon extraction
+- `aiProcessor.ts`: Text cleanup and formatting
+- `snippetManager.ts`: Voice snippet expansion
+- `dictionaryManager.ts`: Custom vocabulary storage
+- `startupManager.ts`: Registry edits for startup
 
-## Project Structure
+**Renderer Process** (`src/renderer/`):
+- Overlay UI with audio visualization
+- Settings window with tabs for configuration
 
--   **src/main**: Backend Logic (Electron Main Process).
-    -   `index.ts`: Application entry point, window management, global hotkey handling.
-    -   `stateManager.ts`: Manages recording state and FFmpeg process.
-    -   `transcriber.ts`: Interfaces with the local Whisper C++ binary.
-    -   `textInjector.ts`: Handles text simulation (typing) into target applications.
-    -   `aiProcessor.ts`: Post-processing (filler word removal, formatting).
-    -   `styleManager.ts`: Detects active window to apply context-specific formatting.
-    -   `startupManager.ts`: Registry manipulation for "Run on Startup".
--   **src/renderer**: Frontend UI.
-    -   `index.html` / `renderer.ts`: The floating overlay UI.
-    -   `settings.html` / `settings.ts`: Configuration window.
--   **resources**: Static assets (icons).
--   **models**: Local Whisper model binaries.
+### Dependencies
 
-## Troubleshooting
+- `electron`: Desktop app framework
+- `nodejs-whisper`: Whisper.cpp bindings for transcription
+- `ffmpeg-static`: Audio recording
+- `robotjs`: Keyboard simulation
+- `active-win`: Active window detection
+- `winreg`: Startup registry management
 
-### Microphone Detection Issues
-If the application uses the wrong microphone:
--   The application attempts to prefer devices with "Realtek" in the name.
--   It uses `chcp 65001` to force UTF-8 encoding when listing devices via FFmpeg. This fixes issues with device names containing non-ASCII characters (e.g., "Réseau de microphones").
+## GPU Acceleration
 
-### Build Errors (node-gyp)
-If `npm install` fails during the `node-gyp rebuild` step:
-1.  Open PowerShell as Administrator.
-2.  Run: `npm install --global --production windows-build-tools` (alternative to VS Build Tools).
-3.  Or, configure npm to use your installed VS Build Tools:
-    ```bash
-    npm config set msvs_version 2022
-    ```
+If you have an NVIDIA GPU with proper drivers, Whisper.cpp will use CUDA automatically. No configuration needed.
 
-### Runtime "Whisper executable not found"
-Ensure the `models` folder exists in the root directory during development, and that the `extraResources` configuration in `package.json` correctly copies it to the production build resources.
+## Configuration
+
+Access Settings from the system tray menu (right-click the tray icon).
+
+**Tabs:**
+- Dictionary: Add custom words and corrections
+- Snippets: Create voice shortcuts
+- Styles: Configure per-app formatting rules
+- General: Toggle processing options
+
+All options are saved and persist between sessions.
+
+## Demo
+
+[![](demo.mp4)](demo.mp4)
 
 ## License
 
