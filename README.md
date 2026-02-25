@@ -1,5 +1,9 @@
 # ChattyWrity
 
+<p align="center">
+  <img src="demo.gif" alt="Demo" width="600">
+</p>
+
 ChattyWrity is a Windows desktop app for voice dictation. Press Ctrl+Space to start speaking, and it transcribes your audio locally using Whisper, then types the result into whichever window you have open.
 
 ## What It Does
@@ -138,10 +142,6 @@ Access Settings from the system tray menu (right-click the tray icon).
 - General: Toggle processing options
 
 All options are saved and persist between sessions.
-
-## Demo
-
-![Demo](demo.gif)
 
 ## License
 
