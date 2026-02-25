@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "crafting-effective-readmes": {
+      "source": "softaworks/agent-toolkit",
+      "sourceType": "github",
+      "computedHash": "cb11facecbb4a15f7ca6cfac2e740ac66798676c246c057879a71babb27c9a4f"
+    },
+    "remotion-best-practices": {
+      "source": "remotion-dev/skills",
+      "sourceType": "github",
+      "computedHash": "7b8684825df186314a85cc61a83d0587cd61f824103ee546aef877a10f4f9255"
+    }
+  }
+}

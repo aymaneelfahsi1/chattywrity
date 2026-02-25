@@ -10,3 +10,5 @@ ChattyWrity Setup 1.0.0.exe
 # Promo and Agent assets
 chattywrity-promo/
 .agents/
+models/
+*.claude/

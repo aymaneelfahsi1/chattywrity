@@ -63,7 +63,7 @@ Right-click the tray icon to enable "Start on Boot" so the app runs automaticall
 
 1. Clone repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/aymaneelfahsi1/chattywrity/
 cd chattywrity
 ```
 
