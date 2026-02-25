@@ -141,7 +141,7 @@ All options are saved and persist between sessions.
 
 ## Demo
 
-![Demo](demo.mp4)
+![Demo](demo.gif)
 
 ## License
 
