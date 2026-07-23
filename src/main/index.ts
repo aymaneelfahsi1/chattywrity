@@ -19,6 +19,22 @@ let aiProcessor: AIProcessor;
 let dictionaryManager: DictionaryManager;
 let snippetManager: SnippetManager;
 let styleManager: StyleManager;
+let toggleAfterReady = process.argv.includes('--toggle-recording');
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+    app.quit();
+}
+app.on('second-instance', (_event, commandLine) => {
+    if (!commandLine.includes('--toggle-recording')) {
+        return;
+    }
+
+    if (stateManager) {
+        void handleHotkeyPress();
+    } else {
+        toggleAfterReady = true;
+    }
+});
 function createOverlayWindow(): BrowserWindow {
     const display = screen.getPrimaryDisplay();
     const { width, height } = display.workAreaSize;
@@ -35,14 +51,14 @@ function createOverlayWindow(): BrowserWindow {
         alwaysOnTop: true,
         skipTaskbar: true,
         resizable: false,
-        focusable: true,
+        focusable: false,
         show: false,
         webPreferences: {
             preload: path.join(__dirname, '../preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
             backgroundThrottling: false,
-            devTools: true
+            devTools: false
         }
     });
     window.loadFile(path.join(__dirname, '../renderer/index.html'));
@@ -126,6 +142,9 @@ function registerHotkey(): void {
     const success = globalShortcut.register('Control+Space', () => {
         handleHotkeyPress();
     });
+    if (!success) {
+        mainWindow?.webContents.send('error', 'HOTKEY ERROR');
+    }
 }
 async function processTranscription(rawText: string): Promise<string> {
     await styleManager.detectActiveApp();
@@ -143,13 +162,12 @@ async function stopAndTranscribe(continueLoop: boolean = false) {
     mainWindow?.webContents.send('state-change', AppState.PROCESSING);
     try {
         const audioPath = await stateManager.stopRecording();
-
         const rawText = await transcriber.transcribe(audioPath);
 
         if (rawText && rawText.trim()) {
             const processedText = await processTranscription(rawText);
-            mainWindow?.webContents.send('transcription-result', processedText);
-            await textInjector.type(processedText + (continueLoop ? ' ' : ''));
+            const injectionMode = await textInjector.type(processedText + (continueLoop ? ' ' : ''));
+            mainWindow?.webContents.send('transcription-result', injectionMode === 'copied' ? `${processedText} (copied)` : processedText);
         }
         if (continueLoop) {
             stateManager.setState(AppState.STARTING);
@@ -213,14 +231,13 @@ async function handleHotkeyPress(): Promise<void> {
     if (currentState === AppState.IDLE) {
         stateManager.setState(AppState.STARTING);
         mainWindow?.show();
-        mainWindow?.focus();
         mainWindow?.webContents.send('state-change', AppState.STARTING);
         updateEscShortcut(true);
         try {
-            stateManager.onSilence = () => {
+            stateManager.onSilence = (reason) => {
                 const current = stateManager.getState();
                 if (current === AppState.RECORDING) {
-                    stopAndTranscribe(true);
+                    stopAndTranscribe(false);
                 }
             };
             await stateManager.startRecording();
@@ -245,6 +262,10 @@ async function handleHotkeyPress(): Promise<void> {
     }
 }
 app.whenReady().then(async () => {
+    if (!gotSingleInstanceLock) {
+        return;
+    }
+
     stateManager = new StateManager();
     transcriber = new Transcriber();
     textInjector = new TextInjector();
@@ -253,10 +274,12 @@ app.whenReady().then(async () => {
     dictionaryManager = new DictionaryManager();
     snippetManager = new SnippetManager();
     styleManager = new StyleManager();
-    transcriber.loadModel().catch(() => { });
     mainWindow = createOverlayWindow();
     settingsWindow = createSettingsWindow();
     tray = createTray();
+    transcriber.loadModel().catch(error => {
+        mainWindow?.webContents.send('error', error.message || 'Whisper preload failed');
+    });
     registerHotkey();
     ipcMain.handle('get-state', () => stateManager.getState());
     ipcMain.handle('toggle-recording', () => handleHotkeyPress());
@@ -286,6 +309,12 @@ app.whenReady().then(async () => {
     });
     ipcMain.handle('processing-get-options', () => aiProcessor.getOptions());
     ipcMain.handle('processing-set-options', (_e, opts: any) => aiProcessor.updateOptions(opts));
+    if (toggleAfterReady) {
+        toggleAfterReady = false;
+        setTimeout(() => {
+            void handleHotkeyPress();
+        }, 250);
+    }
 });
 app.on('will-quit', () => {
     globalShortcut.unregisterAll();
@@ -293,5 +322,6 @@ app.on('will-quit', () => {
 app.on('window-all-closed', () => {
 });
 app.on('before-quit', () => {
+    transcriber?.stopServer();
     settingsWindow?.destroy();
 });

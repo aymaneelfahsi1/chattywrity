@@ -12,3 +12,4 @@ chattywrity-promo/
 .agents/
 models/
 *.claude/
+.cuda-host-gcc13/

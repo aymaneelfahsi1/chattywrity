@@ -1,10 +1,9 @@
-import { spawn, ChildProcess, execSync } from 'child_process';
+import { spawn, ChildProcess, execFileSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import ffmpegStatic from 'ffmpeg-static';
 
-const ffmpegPath = ffmpegStatic?.replace('app.asar', 'app.asar.unpacked') || 'ffmpeg';
+const ffmpegPath = resolveFfmpegPath();
 
 export enum AppState {
     IDLE = 'idle',
@@ -14,47 +13,115 @@ export enum AppState {
     TYPING = 'typing'
 }
 
+export type SilenceReason = 'post-speech';
+
 export class StateManager {
     private state: AppState = AppState.IDLE;
     private recordingProcess: ChildProcess | null = null;
     private audioFilePath: string = '';
     private microphoneName: string = '';
-    public onSilence: (() => void) | null = null;
+    public onSilence: ((reason: SilenceReason) => void) | null = null;
 
     constructor() {
         this.detectMicrophone();
     }
 
     private detectMicrophone(): void {
+        if (process.platform !== 'win32') {
+            this.microphoneName = process.env.CHATTYWRITY_AUDIO_SOURCE || this.findLinuxMicrophone();
+            return;
+        }
+
         try {
-            const command = `chcp 65001 && "${ffmpegPath}" -list_devices true -f dshow -i dummy 2>&1`;
-            const result = execSync(command, {
+            const result = execFileSync(ffmpegPath, ['-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'], {
                 encoding: 'utf8',
                 timeout: 5000,
                 stdio: ['ignore', 'pipe', 'pipe']
             }).toString();
 
-            const audioMatches = [...result.matchAll(/"([^"]+)"\s*\(audio\)/g)];
-
-            if (audioMatches.length > 0) {
-                const names = audioMatches.map(m => m[1]);
-                const preferred = names.find(n => n.includes('Realtek')) || names[0];
-                this.microphoneName = preferred;
-            } else {
-                this.microphoneName = 'Microphone';
-            }
+            this.microphoneName = this.extractWindowsMicrophone(result);
         } catch (error) {
             const output = (error as any).stdout?.toString() || (error as any).stderr?.toString() || '';
-            const audioMatches = [...output.matchAll(/"([^"]+)"\s*\(audio\)/g)];
+            this.microphoneName = this.extractWindowsMicrophone(output);
+        }
+    }
 
-            if (audioMatches.length > 0) {
-                const names = audioMatches.map(m => m[1]);
-                const preferred = names.find(n => n.includes('Realtek')) || names[0];
-                this.microphoneName = preferred;
-            } else {
-                this.microphoneName = 'Microphone';
+    private extractWindowsMicrophone(output: string): string {
+        const audioMatches = [...output.matchAll(/"([^"]+)"\s*\(audio\)/g)];
+
+        if (audioMatches.length === 0) {
+            return 'Microphone';
+        }
+
+        const names = audioMatches.map(m => m[1]);
+        return names.find(n => n.includes('Realtek')) || names[0];
+    }
+
+    private findLinuxMicrophone(): string {
+        if (process.env.CHATTYWRITY_USE_EASYEFFECTS !== '0') {
+            const existingSource = this.findPulseSource('easyeffects_source');
+            if (existingSource) {
+                return existingSource;
+            }
+
+            this.startEasyEffects();
+            const startedSource = this.waitForPulseSource('easyeffects_source', 4000);
+            if (startedSource) {
+                return startedSource;
             }
         }
+
+        return 'default';
+    }
+
+    private findPulseSource(sourceName: string): string | null {
+        try {
+            const result = execFileSync('pactl', ['list', 'short', 'sources'], {
+                encoding: 'utf8',
+                timeout: 2000,
+                stdio: ['ignore', 'pipe', 'pipe']
+            }).toString();
+            const sources = result.split('\n')
+                .map(line => line.split('\t')[1])
+                .filter(Boolean);
+            return sources.find(source => source === sourceName) || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    private waitForPulseSource(sourceName: string, timeoutMs: number): string | null {
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < timeoutMs) {
+            const source = this.findPulseSource(sourceName);
+            if (source) {
+                return source;
+            }
+
+            this.sleep(200);
+        }
+
+        return null;
+    }
+
+    private startEasyEffects(): void {
+        const executable = findExecutable('easyeffects');
+        if (!executable) {
+            return;
+        }
+
+        try {
+            const child = spawn(executable, ['--service-mode', '--hide-window'], {
+                detached: true,
+                stdio: 'ignore'
+            });
+            child.unref();
+        } catch (error) {
+        }
+    }
+
+    private sleep(milliseconds: number): void {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
     }
 
     getState(): AppState {
@@ -62,6 +129,7 @@ export class StateManager {
     }
 
     setState(newState: AppState): void {
+        this.debug(`state ${this.state} -> ${newState}`);
         this.state = newState;
     }
 
@@ -69,60 +137,56 @@ export class StateManager {
         return new Promise((resolve, reject) => {
             const tempDir = os.tmpdir();
             this.audioFilePath = path.join(tempDir, `chattywrity_${Date.now()}.wav`);
-
-            this.recordingProcess = spawn(ffmpegPath, [
-                '-f', 'dshow',
-                '-i', `audio=${this.microphoneName}`,
-                '-y',
-                '-af', 'silencedetect=noise=-30dB:d=2.0',
-                '-ar', '16000',
-                '-ac', '1',
-                '-fflags', 'nobuffer',
-                '-flags', 'low_delay',
-                '-analyzeduration', '0',
-                '-probesize', '32',
-                '-audio_buffer_size', '0',
-                this.audioFilePath
-            ], {
+            this.debug(`recording to ${this.audioFilePath}`);
+            this.recordingProcess = spawn(ffmpegPath, this.createRecordingArgs(), {
                 stdio: ['pipe', 'pipe', 'pipe']
             });
 
             let started = false;
 
+            const finishStart = () => {
+                if (!started) {
+                    started = true;
+                    resolve();
+                }
+            };
+
             const onData = (data: Buffer) => {
                 const text = data.toString();
 
-                if (!started && (text.includes('Output #0') || text.includes('size='))) {
-                    started = true;
-                    resolve();
+                if (text.includes('Output #0') || text.includes('size=')) {
+                    finishStart();
                 }
 
                 const silenceMatch = text.match(/silence_start:\s*(\d+(\.\d+)?)/);
                 if (silenceMatch) {
                     const silenceTime = parseFloat(silenceMatch[1]);
-                    if (silenceTime >= 0.5) {
-                        if (this.onSilence) {
-                            this.onSilence();
-                        }
+                    this.debug(`silence_start ${silenceTime}`);
+                    if (silenceTime >= 0.5 && this.onSilence) {
+                        this.onSilence('post-speech');
                     }
                 }
             };
 
             this.recordingProcess.stderr?.on('data', onData);
 
-            this.recordingProcess.on('error', (err) => {
+            this.recordingProcess.on('error', err => {
+                this.debug(`ffmpeg error ${err.message}`);
                 if (!started) {
                     started = true;
                     reject(err);
                 }
             });
 
-            setTimeout(() => {
-                if (!started) {
+            this.recordingProcess.on('exit', code => {
+                this.debug(`ffmpeg exit ${code}`);
+                if (!started && code !== 0) {
                     started = true;
-                    resolve();
+                    reject(new Error(`FFmpeg exited with code ${code}`));
                 }
-            }, 1500);
+            });
+
+            setTimeout(finishStart, 1500);
         });
     }
 
@@ -133,34 +197,43 @@ export class StateManager {
                 return;
             }
 
+            let settled = false;
+
+            const finish = () => {
+                if (settled) {
+                    return;
+                }
+
+                settled = true;
+                const filePath = this.audioFilePath;
+                this.recordingProcess = null;
+
+                setTimeout(() => {
+                    if (!fs.existsSync(filePath)) {
+                        reject(new Error('Audio file not created'));
+                        return;
+                    }
+
+                    const stats = fs.statSync(filePath);
+
+                    if (stats.size < 6000) {
+                        reject(new Error('Audio too short'));
+                    } else {
+                        resolve(filePath);
+                    }
+                }, 300);
+            };
+
             if (this.recordingProcess.stdin?.writable) {
                 this.recordingProcess.stdin.write('q');
             }
 
-            const cleanup = () => {
-                setTimeout(() => {
-                    if (fs.existsSync(this.audioFilePath)) {
-                        const stats = fs.statSync(this.audioFilePath);
-
-                        if (stats.size < 6000) {
-                            reject(new Error('Audio too short'));
-                        } else {
-                            resolve(this.audioFilePath);
-                        }
-                    } else {
-                        reject(new Error('Audio file not created'));
-                    }
-                }, 500);
-            };
-
-            this.recordingProcess.on('close', cleanup);
+            this.recordingProcess.once('close', finish);
 
             setTimeout(() => {
                 if (this.recordingProcess) {
-                    try {
-                        this.recordingProcess.kill('SIGTERM');
-                    } catch (e) { }
-                    cleanup();
+                    this.recordingProcess.kill('SIGTERM');
+                    finish();
                 }
             }, 2000);
         });
@@ -183,5 +256,86 @@ export class StateManager {
         }
 
         this.state = AppState.IDLE;
+    }
+
+    private createRecordingArgs(): string[] {
+        const commonArgs = [
+            '-y',
+            '-af', this.createSilenceFilter(),
+            '-ar', '16000',
+            '-ac', '1',
+            '-fflags', 'nobuffer',
+            '-flags', 'low_delay',
+            '-analyzeduration', '0',
+            '-probesize', '32',
+            this.audioFilePath
+        ];
+
+        if (process.platform === 'win32') {
+            return [
+                '-f', 'dshow',
+                '-i', `audio=${this.microphoneName}`,
+                '-audio_buffer_size', '0',
+                ...commonArgs
+            ];
+        }
+
+        if (process.platform === 'darwin') {
+            return [
+                '-f', 'avfoundation',
+                '-i', process.env.CHATTYWRITY_AUDIO_SOURCE || ':0',
+                ...commonArgs
+            ];
+        }
+
+        return [
+            '-f', 'pulse',
+            '-i', this.microphoneName,
+            ...commonArgs
+        ];
+    }
+
+    private createSilenceFilter(): string {
+        const noise = process.env.CHATTYWRITY_SILENCE_NOISE || '-30dB';
+        const duration = process.env.CHATTYWRITY_SILENCE_DURATION || '2.0';
+        this.debug(`silence filter noise=${noise} duration=${duration}`);
+        return `silencedetect=noise=${noise}:d=${duration}`;
+    }
+
+    private debug(message: string): void {
+    }
+}
+
+function resolveFfmpegPath(): string {
+    if (process.platform === 'linux') {
+        const systemPath = findExecutable('ffmpeg');
+        if (systemPath) {
+            return systemPath;
+        }
+    }
+
+    return findOptionalFfmpegStatic() || 'ffmpeg';
+}
+
+function findExecutable(name: string): string | null {
+    const pathValue = process.env.PATH || '';
+    const directories = pathValue.split(path.delimiter).filter(Boolean);
+
+    for (const directory of directories) {
+        const candidate = path.join(directory, name);
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
+function findOptionalFfmpegStatic(): string | null {
+    try {
+        const ffmpegStatic = require('ffmpeg-static') as string | null;
+        return ffmpegStatic?.replace('app.asar', 'app.asar.unpacked') || null;
+    } catch (error) {
+        return null;
     }
 }
